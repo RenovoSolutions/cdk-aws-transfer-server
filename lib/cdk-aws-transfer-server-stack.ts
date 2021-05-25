@@ -2,6 +2,7 @@ import * as cdk from '@aws-cdk/core';
 import * as transfer from '@aws-cdk/aws-transfer';
 import * as iam from '@aws-cdk/aws-iam';
 import * as s3 from '@aws-cdk/aws-s3';
+import * as r53 from '@aws-cdk/aws-route53';
 import { assert } from 'console';
 
 export class CdkAwsTransferServerStack extends cdk.Stack {
@@ -17,6 +18,26 @@ export class CdkAwsTransferServerStack extends cdk.Stack {
       identityProviderType: "SERVICE_MANAGED",
       endpointType: "PUBLIC",
       loggingRole: transferLoggingRole.roleArn
+    })
+
+    let parentDomain = 'renovolive.com'
+
+    if (process.env.CDK_TARGET_ENV == 'dev') {
+      parentDomain = 'dev.renovolive.com'
+    }
+
+    if (process.env.CDK_TARGET_ENV == 'services') {
+      parentDomain = 'services.renovolive.com'
+    }
+
+    const parentZone = r53.HostedZone.fromLookup(this, 'parentZone', {
+      domainName: parentDomain
+    })
+
+    const transferCname = new r53.CnameRecord(this, 'transferCname', {
+      domainName: transferServer.attrServerId + '.server.transfer.' + this.region + '.amazonaws.com',
+      recordName: this.node.tryGetContext('hostname'),
+      zone: parentZone
     })
 
     const uploadBucket = new s3.Bucket(this, 'uploadBucket', {
